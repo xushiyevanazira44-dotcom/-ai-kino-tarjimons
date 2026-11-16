@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Kino Tarjimon UZ</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#f4f6ff;font-family:Arial,sans-serif}
+main{max-width:760px;margin:24px auto;padding:16px}.card{background:#14213a;border:1px solid #304365;border-radius:18px;padding:22px;margin:16px 0}
+h1{font-size:clamp(28px,7vw,40px);margin:8px 0 12px}p{color:#c5cee0;line-height:1.55}
+label{display:block;font-weight:bold;margin:16px 0 8px}input{width:100%;padding:13px;border:1px solid #52688d;border-radius:10px;background:#091326;color:white}
+button{width:100%;padding:15px;border:0;border-radius:12px;background:#ffd044;color:#171717;font-weight:bold;font-size:16px;margin-top:14px}
+button:disabled{opacity:.55}.status{padding:14px;background:#091326;border-radius:10px;margin-top:14px;overflow-wrap:anywhere;line-height:1.5}
+a{color:#ffdc70}.small{font-size:13px;color:#aebbd5}.tag{display:inline-block;background:#263958;border-radius:30px;padding:6px 10px;font-size:12px}
+</style></head>
+<body><main>
+<div class="card"><span class="tag">AI OVOZLI DUBLYAJ</span><h1>🎬 AI Kino Tarjimon UZ</h1>
+<p>Boshqa tildagi videoni o‘zbekchaga tarjima qilib, sun’iy ovoz bilan dublyaj qilish.</p></div>
+<div class="card">
+<label for="backend">1. AI server manzili (Render URL)</label>
+<input id="backend" type="url" placeholder="https://ai-kino-api.onrender.com">
+<p class="small">Bu manzil Render'dagi backend serveringiz URL'i bo‘lishi kerak. Netlify saytingiz manzilini bu yerga yozmang.</p>
+<button id="check" type="button" onclick="checkServer()">Serverni tekshirish</button>
+<label for="video">2. Kino yoki video faylini tanlang</label>
+<input id="video" type="file" accept="video/*,.mp4,.mov,.mkv,.avi">
+<p class="small">Video serverga yuboriladi. Katta videolar uzoq vaqt va ko‘proq server xotirasini talab qiladi.</p>
+<button id="go" type="button" onclick="startDub()">🇺🇿 Tarjima va dublyajni boshlash</button>
+<div id="status" class="status">Avval Render server manzilini kiriting va “Serverni tekshirish” tugmasini bosing.</div>
+</div>
+<p class="small">OpenAI API kaliti faqat backend serverda saqlanishi kerak. API ishlatilishi pullik bo‘lishi mumkin. Faqat foydalanish huquqingiz bo‘lgan videolarni yuklang.</p>
+</main>
+<script>
+const backend=document.getElementById('backend'), statusBox=document.getElementById('status');
+const checkBtn=document.getElementById('check'), goBtn=document.getElementById('go');
+backend.value=localStorage.getItem('kino_backend')||'';
+function baseUrl(){return backend.value.trim().replace(/\/+$/,'');}
+async function readResponse(res){
+ const raw=await res.text();
+ let data;
+ try{data=JSON.parse(raw)}catch(e){
+   const preview=raw.slice(0,180).replace(/</g,'&lt;');
+   throw new Error(`Server JSON emas, HTML/text qaytardi (HTTP ${res.status}). Backend URL noto‘g‘ri yoki server ishlamayapti. Javob: ${preview}`);
+ }
+ if(!res.ok) throw new Error(data.error||`Server xatosi: HTTP ${res.status}`);
+ return data;
+}
+async function checkServer(){
+ const base=baseUrl(); if(!base){statusBox.textContent='Render URL manzilini kiriting.';return;}
+ localStorage.setItem('kino_backend',base);checkBtn.disabled=true;statusBox.textContent='Server tekshirilmoqda...';
+ try{const r=await fetch(base+'/health');const d=await readResponse(r);
+ statusBox.textContent=d.ok?'✅ Server ishlayapti. Endi video tanlab dublyajni boshlashingiz mumkin.':'Server javobi kutilganidek emas.';
+ }catch(e){statusBox.textContent='❌ '+e.message;}finally{checkBtn.disabled=false;}
+}
+async function startDub(){
+ const base=baseUrl(), file=document.getElementById('video').files[0];
+ if(!base){statusBox.textContent='Avval Render backend URL manzilini kiriting.';return;}
+ if(!file){statusBox.textContent='Video faylini tanlang.';return;}
+ localStorage.setItem('kino_backend',base);
+ const fd=new FormData();fd.append('video',file);
+ goBtn.disabled=true;statusBox.textContent='⏳ Video serverga yuborilmoqda. Tarjima va ovoz yaratish video uzunligiga qarab vaqt oladi. Sahifani yopmang.';
+ try{
+   const r=await fetch(base+'/api/dub',{method:'POST',body:fd});
+   const d=await readResponse(r);
+   if(!d.download)throw new Error('Server javobida yuklab olish havolasi yo‘q.');
+   const a=document.createElement('a');a.href=base+d.download;a.textContent='⬇ O‘zbekcha dublyaj qilingan MP4 videoni yuklab olish';a.target='_blank';a.rel='noopener';
+   statusBox.textContent=`✅ Tayyor! ${d.segments||''} ta nutq bo‘lagi qayta ishlandi. `;
+   statusBox.appendChild(document.createElement('br'));statusBox.appendChild(a);
+ }catch(e){statusBox.textContent='❌ Xatolik: '+e.message;}
+ finally{goBtn.disabled=false;}
+}
+</script></body></html>
